@@ -4,6 +4,9 @@
     <CudaCompile Include="game_of_life.cu">
       <Filter>cuda</Filter>
     </CudaCompile>
+    <CudaCompile Include="device_buffer.h">
+      <Filter>cuda</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="sdl">
@@ -17,8 +20,17 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="window.cpp">
+    <ClCompile Include="game_window.cpp">
       <Filter>sdl</Filter>
     </ClCompile>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="grid_buffer.h">
+      <Filter>common</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="game_window.h">
+      <Filter>sdl</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
