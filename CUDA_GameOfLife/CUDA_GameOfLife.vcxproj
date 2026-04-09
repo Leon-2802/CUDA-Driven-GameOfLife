@@ -79,13 +79,8 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CudaCompile Include="device_buffer.h" />
-    <CudaCompile Include="game_of_life.cu" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="grid_buffer.h" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="game_window.cpp" />
+    <ClCompile Include="sdl\game_window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\Documents\Libraries\SDL-main\VisualC\SDL\SDL.vcxproj">
@@ -93,7 +88,12 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="game_window.h" />
+    <ClInclude Include="common\grid_buffer.h" />
+    <ClInclude Include="cuda\device_buffer.h" />
+    <ClInclude Include="sdl\game_window.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="cuda\game_of_life.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

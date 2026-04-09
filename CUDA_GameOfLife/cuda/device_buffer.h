@@ -8,7 +8,7 @@ struct DeviceGridBuffer {
     uint8_t* ptr = nullptr;
     size_t   size = 0;
 
-    void alloc(size_t n) { cudaMalloc(&ptr, n); size = n; }
+    DeviceGridBuffer(size_t n) { cudaMalloc(&ptr, n); size = n; }
     ~DeviceGridBuffer() { cudaFree(ptr); }
 
     // Disable copy, allow move
@@ -22,6 +22,8 @@ struct DeviceGridBuffer {
 struct SimulationBuffers {
     DeviceGridBuffer_t current;
     DeviceGridBuffer_t next;
+
+    SimulationBuffers(size_t n) : current(n), next(n) {}
 
     // Swapping the pointers between the two generation buffers after each iteration is a lot cheaper than copying data
     void swap() {

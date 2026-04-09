@@ -1,7 +1,6 @@
 // CUDA includes
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#include <device_functions.h>
 #include "common_functions.h"
 #include "driver_types.h"
 
@@ -16,7 +15,6 @@
 
 
 namespace CUDASimulation {
-
 	// Grid of Game of Life, to be allocated on the device (GPU)
 	// Two are required to save redundant copying of data
 	// Static to keep it local to this file
@@ -42,8 +40,6 @@ namespace CUDASimulation {
 
 	void init(int gridWidth, int gridHeight) {
 		const int totalCells = gridWidth * gridHeight;
-		simumationBuffers.current.alloc(totalCells);
-		simumationBuffers.next.alloc(totalCells);
 		// Check for errors after allocating:
 		cudaError_t err = cudaGetLastError();
 		if (err != cudaSuccess) std::cerr << cudaGetErrorString(err) << std::endl;

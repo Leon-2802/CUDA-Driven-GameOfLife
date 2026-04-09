@@ -1,4 +1,4 @@
-#include "game_window.h"
+#include "./sdl/game_window.h"
 
 int main() {
 	GameWindow window(800, 600, false);
