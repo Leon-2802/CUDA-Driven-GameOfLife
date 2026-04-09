@@ -6,40 +6,70 @@
 
 // System includes
 #include <iostream>
+#include <memory>
+#include <chrono>
 
 // Local includes
 #include "device_buffer.h"
+#include "cuda_simulation.h"
 
 
-#define NUM_THREADS_PER_BLOCK 1024
 
 
 namespace CUDASimulation {
+
+#define NUM_THREADS_PER_BLOCK 1024
+
 	// Grid of Game of Life, to be allocated on the device (GPU)
 	// Two are required to save redundant copying of data
 	// Static to keep it local to this file
-	static SimulationBuffers_t simumationBuffers;
+	static std::shared_ptr<SimulationBuffers> simumationBuffers = nullptr;
 
+	/**
+	* @brief Provides easier row and column based index for a 2D matrix that is layed out in 1D row-major order
+	*/
 	__device__ __forceinline__ int calcIdx(int row, int numCols, int col)
 	{
 		return row * numCols + col;
 	}
 
+	/*
+	* @brief A noise-based RNG, reasonably well-known within game development circles.
+	* Allows threads to compute their random value independently, based on their position on the grid.
+	* It is not as stable and tested as other more well-known RNG algorithms, but more than sufficient in this case.
+	*/
+	__device__ uint32_t squirrel3(uint32_t pos, uint32_t seed = 0) {
+		constexpr uint32_t BIT_NOISE1 = 0xB5297A4Du;
+		constexpr uint32_t BIT_NOISE2 = 0x68E31DA4u;
+		constexpr uint32_t BIT_NOISE3 = 0x1B56C4E9u;
+
+		uint32_t mangled = pos;
+		mangled *= BIT_NOISE1; // (1) multiply — spreads bits across the word
+		mangled += seed; // (2) add seed — decorrelates different runs
+		mangled ^= (mangled >> 8); // (3) xorshift — folds high bits into low bits
+		mangled += BIT_NOISE2; // (4) add — breaks symmetry after the xorshift
+		mangled ^= (mangled << 8); // (5) xorshift — folds low bits into high bits
+		mangled *= BIT_NOISE3; // (6) multiply — avalanches the mixed bits
+		mangled ^= (mangled >> 8); // (7) xorshift — final fold
+		return mangled;
+	}
+
 	/**
 	* @brief This CUDA kernel intializes the grid with random values for the cell states
 	*/
-	__global__ void intializeGridRandom(uint8_t* dGrid, const int totalCells) {
+	__global__ void initializeGridRandom(uint8_t* dGrid, const int totalCells, uint32_t seed) {
 		int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
 		// guard against out-of-bounds access (necessary as last thread block may be partial)
 		if (idx >= totalCells) return;  
 
-		//REFACTOR Use cuRAND 
-		dGrid[idx] = (idx * 1664525u + 1013904223u) >> 31;  // 0 or 1
+		// Aquire random value based on current position
+		dGrid[idx] = squirrel3(idx, seed) >> 31; // 0 or 1
 	}
 
 	void init(int gridWidth, int gridHeight) {
 		const int totalCells = gridWidth * gridHeight;
+		simumationBuffers = std::make_shared<SimulationBuffers>(totalCells);
 		// Check for errors after allocating:
 		cudaError_t err = cudaGetLastError();
 		if (err != cudaSuccess) std::cerr << cudaGetErrorString(err) << std::endl;
@@ -53,9 +83,10 @@ namespace CUDASimulation {
 
 		// Each thread covers one cell; ceiling division ensures every cell gets covered
 		const int numBlocks = (totalCells + NUM_THREADS_PER_BLOCK - 1) / NUM_THREADS_PER_BLOCK;
-		constexpr int blockMatrixSize = NUM_THREADS_PER_BLOCK * NUM_THREADS_PER_BLOCK;
-		constexpr size_t sharedMemSize = sizeof(int) * blockMatrixSize;
-		intializeGridRandom << <numBlocks, NUM_THREADS_PER_BLOCK, blockMatrixSize >> > (simumationBuffers.current.ptr, totalCells);
+		// Aquire the seed based on current time in nanoseconds
+		const uint32_t seed = static_cast<uint32_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+		// Run the kernel
+		initializeGridRandom << <numBlocks, NUM_THREADS_PER_BLOCK >> > (simumationBuffers->currentPtr(), totalCells, seed);
 
 		err = cudaGetLastError();
 		if (err != cudaSuccess) std::cerr << cudaGetErrorString(err) << std::endl;

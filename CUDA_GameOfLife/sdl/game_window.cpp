@@ -1,6 +1,8 @@
 #include "game_window.h"
 #include <SDL3/SDL.h>
 
+using namespace GUI;
+
 GameWindow::GameWindow(int width, int height, bool fullscreen) {
     SDL_Init(SDL_INIT_VIDEO);
     if (fullscreen) {

@@ -89,11 +89,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common\grid_buffer.h" />
+    <ClInclude Include="cuda\cuda_simulation.h" />
     <ClInclude Include="cuda\device_buffer.h" />
     <ClInclude Include="sdl\game_window.h" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="cuda\game_of_life.cu" />
+    <CudaCompile Include="cuda\cuda_simulation.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

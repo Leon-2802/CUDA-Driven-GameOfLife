@@ -27,9 +27,12 @@
     <ClInclude Include="sdl\game_window.h">
       <Filter>sdl</Filter>
     </ClInclude>
+    <ClInclude Include="cuda\cuda_simulation.h">
+      <Filter>cuda</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="cuda\game_of_life.cu">
+    <CudaCompile Include="cuda\cuda_simulation.cu">
       <Filter>cuda</Filter>
     </CudaCompile>
   </ItemGroup>

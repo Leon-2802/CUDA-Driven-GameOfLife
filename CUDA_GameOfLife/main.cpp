@@ -1,10 +1,11 @@
 #include "./sdl/game_window.h"
+#include "cuda/cuda_simulation.h"
 
 int main() {
-	GameWindow window(800, 600, false);
+	GUI::GameWindow window(800, 600, false);
 	bool running = true;
 
-	// call cuda init function
+	CUDASimulation::init(10000, 10000);
 
 	while (running) {
 		window.run();
