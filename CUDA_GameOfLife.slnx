@@ -2,5 +2,11 @@
   <Configurations>
     <Platform Name="x64" />
   </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path="project_report.md" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="../../../Documents/Libraries/SDL-main/VisualC/SDL/SDL.vcxproj" Id="81ce8daf-ebb2-4761-8e45-b71abcca8c68" />
   <Project Path="CUDA_GameOfLife/CUDA_GameOfLife.vcxproj" />
+  <Project Path="GameOfLife_Test/GameOfLife_Test.vcxproj" Id="5a521048-7e3c-4086-9763-5b6461d4d2da" />
 </Solution>
