@@ -1,5 +1,6 @@
 #pragma once
 #include <SDL3/SDL.h>
+#include <vector>
 
 namespace GUI {
 	/**
@@ -12,7 +13,7 @@ namespace GUI {
 		void clear() const;
 		void drawCell(int x, int y);
 		bool processEvents();
-		void run() const;
+		void run(std::vector<bool> viewportData) const;
 	private:
 		SDL_Window* window_ = nullptr;
 		SDL_Renderer* renderer_ = nullptr;

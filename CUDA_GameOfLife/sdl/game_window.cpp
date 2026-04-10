@@ -1,5 +1,6 @@
 #include "game_window.h"
 #include <SDL3/SDL.h>
+#include <vector>
 
 using namespace GUI;
 
@@ -40,7 +41,7 @@ bool GameWindow::processEvents() {
     return true;
 }
 
-void GameWindow::run() const {
+void GameWindow::run(std::vector<bool> viewportData) const {
     SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255);
     SDL_RenderClear(renderer_);
     SDL_RenderPresent(renderer_);

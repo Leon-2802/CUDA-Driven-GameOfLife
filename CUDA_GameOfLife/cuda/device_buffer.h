@@ -23,17 +23,21 @@ namespace CUDASimulation {
     */
     class SimulationBuffers {
     public:
-        SimulationBuffers(size_t n) : current(n), next(n) {}
+        SimulationBuffers(int width, int height) : current_(width*height), next_(width*height), width_(width), height_(height) {}
 
-        uint8_t* currentPtr() const { return current.ptr; }
-        uint8_t* nextPtr() const { return next.ptr; }
+        uint8_t* currentPtr() const { return current_.ptr; }
+        uint8_t* nextPtr() const { return next_.ptr; }
+        int width() const { return width_; }
+        int height() const { return height_; }
 
         // Swapping the pointers between the two generation buffers after each iteration is a lot cheaper than copying data
         void swap() {
-            std::swap(current.ptr, next.ptr);
+            std::swap(current_.ptr, next_.ptr);
         }
     private:
-        DeviceGridBuffer_t current;
-        DeviceGridBuffer_t next;
+        DeviceGridBuffer_t current_;
+        DeviceGridBuffer_t next_;
+        int width_;
+        int height_;
     };
 }

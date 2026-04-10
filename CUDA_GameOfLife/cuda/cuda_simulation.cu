@@ -67,9 +67,16 @@ namespace CUDASimulation {
 		dGrid[idx] = squirrel3(idx, seed) >> 31; // 0 or 1
 	}
 
+	/**
+	* @brief Calculates the state of each cell on a seperate thread by reading neighbour cell states from global memory
+	*/
+	__global__ void calculateNextGeneration(uint8_t* dGrid, const int width, const int height) {
+		// REFACTOR: Add shared memory later to lower slow global memory traffic
+	}
+
 	void init(int gridWidth, int gridHeight) {
 		const int totalCells = gridWidth * gridHeight;
-		simumationBuffers = std::make_shared<SimulationBuffers>(totalCells);
+		simumationBuffers = std::make_shared<SimulationBuffers>(gridWidth, gridHeight);
 		// Check for errors after allocating:
 		cudaError_t err = cudaGetLastError();
 		if (err != cudaSuccess) std::cerr << cudaGetErrorString(err) << std::endl;
@@ -98,13 +105,46 @@ namespace CUDASimulation {
 		// Calculate the elapsed time
 		float milliseconds = 0;
 		cudaEventElapsedTime(&milliseconds, start, stop);
-		std::cout << "Runtime for initialization with grid dimension " << gridWidth << " x " << gridHeight << ": " << milliseconds << std::endl;
+		std::cout << "Runtime for initialization with grid dimension " << gridWidth << " x " << gridHeight << " in milliseconds: " << milliseconds << std::endl;
 		// Cleanup events
 		cudaEventDestroy(start);
 		cudaEventDestroy(stop);
 	}
 
 	void advance() {
+		const int totalCells = simumationBuffers->width() * simumationBuffers->height();
 
+		// Create CUDA events for timing
+		cudaEvent_t start, stop;
+		cudaEventCreate(&start);
+		cudaEventCreate(&stop);
+		// Record the start event
+		cudaEventRecord(start);
+
+		// Each thread covers one cell; ceiling division ensures every cell gets covered
+		const int numBlocks = (totalCells + NUM_THREADS_PER_BLOCK - 1) / NUM_THREADS_PER_BLOCK;
+
+		cudaError_t err = cudaGetLastError();
+		if (err != cudaSuccess) std::cerr << cudaGetErrorString(err) << std::endl;
+
+		// Record the stop event
+		cudaEventRecord(stop);
+		// Wait for the stop event to complete
+		cudaEventSynchronize(stop);
+		// Calculate the elapsed time
+		float milliseconds = 0;
+		cudaEventElapsedTime(&milliseconds, start, stop);
+		std::cout << "Runtime for advance step with grid dimension " << simumationBuffers->width() << " x " << simumationBuffers->height() << " in milliseconds: " << milliseconds << std::endl;
+		// Cleanup events
+		cudaEventDestroy(start);
+		cudaEventDestroy(stop);
+	}
+
+	std::vector<bool> getViewportData(int startX, int startY, int viewportWidth, int viewportHeight) {
+		std::vector<bool> subgrid;
+		// Reserve the necessary space of the subgrid (note that the origin of the grid is at the top left corner of the screen)
+		subgrid.reserve((viewportWidth - startX) * (viewportHeight - startY));
+		//TODO memcpy from simumationBuffers->currentPtr to subgrid
+		return subgrid;
 	}
 }
