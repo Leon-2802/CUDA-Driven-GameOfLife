@@ -19,7 +19,7 @@ jobs:
         vcpkg integrate install
 
     - name: Install CUDA Toolkit
-      uses: Jimver/cuda-toolkit@v0.2.19
+      uses: Jimver/cuda-toolkit@v0.2.35
       with:
         cuda: '13.2.0'
         method: 'network'
