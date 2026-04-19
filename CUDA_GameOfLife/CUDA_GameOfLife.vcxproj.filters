@@ -18,21 +18,21 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="common\grid_buffer.h">
-      <Filter>common</Filter>
-    </ClInclude>
-    <ClInclude Include="cuda\device_buffer.h">
-      <Filter>cuda</Filter>
-    </ClInclude>
-    <ClInclude Include="sdl\game_window.h">
+    <ClInclude Include="sdl\game_window.hpp">
       <Filter>sdl</Filter>
     </ClInclude>
-    <ClInclude Include="cuda\cuda_simulation.h">
+    <ClInclude Include="cuda\cuda_simulation.hpp">
       <Filter>cuda</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="cuda\cuda_simulation.cu">
+      <Filter>cuda</Filter>
+    </CudaCompile>
+    <CudaCompile Include="cuda\device_buffer.cuh">
+      <Filter>cuda</Filter>
+    </CudaCompile>
+    <CudaCompile Include="cuda\simulation_buffers.cuh">
       <Filter>cuda</Filter>
     </CudaCompile>
   </ItemGroup>
