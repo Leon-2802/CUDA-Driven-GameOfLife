@@ -1,0 +1,19 @@
+name: MSBUILD CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: microsoft/setup-msbuild@v2
+
+    - name: Build
+      run: msbuild CUDA_GameOfLife.slnx /p:Configuration=Release /p:Platform=x64 /m
