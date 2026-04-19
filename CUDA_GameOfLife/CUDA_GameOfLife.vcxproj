@@ -101,9 +101,6 @@
   <ItemGroup>
     <CudaCompile Include="cuda\cuda_simulation.cu" />
   </ItemGroup>
-  <ItemGroup>
-    <Text Include="CMakeLists.txt" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 13.2.targets" />

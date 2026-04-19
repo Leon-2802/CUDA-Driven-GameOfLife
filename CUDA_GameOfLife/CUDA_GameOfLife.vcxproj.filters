@@ -36,7 +36,4 @@
       <Filter>cuda</Filter>
     </CudaCompile>
   </ItemGroup>
-  <ItemGroup>
-    <Text Include="CMakeLists.txt" />
-  </ItemGroup>
 </Project>

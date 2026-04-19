@@ -18,7 +18,7 @@ int main() {
 	bool running = true;
 	std::mutex viewportMutex;
 
-	CUDASimulation::init(10000, 10000, true);
+	CUDASimulation::init(20000, 20000, true);
 
 	// Launch CUDA simulation in a seperate thread and keep run with a tick of 100ms
 	// Prevents from blocking the main thread where to GUI runs
@@ -43,7 +43,7 @@ int main() {
 
 		{
 			std::scoped_lock lock(viewportMutex);
-			auto viewportData = CUDASimulation::getViewportData(0, 0, VIEWPORT_WIDTH / viewport.getCellSquareSize(), VIEWPORT_HEIGHT / viewport.getCellSquareSize());
+			auto viewportData = CUDASimulation::getViewportData(240, 1000, VIEWPORT_WIDTH / viewport.getCellSquareSize(), VIEWPORT_HEIGHT / viewport.getCellSquareSize());
 			if (viewportData.has_value()) {
 				viewport.update(viewportData.value());
 			} 
