@@ -58,6 +58,7 @@
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
+      <AdditionalOptions> -std=c++20 %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -79,6 +80,7 @@
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
+      <AdditionalOptions> -std=c++20 %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -91,13 +93,16 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="common\grid_buffer.h" />
-    <ClInclude Include="cuda\cuda_simulation.h" />
-    <ClInclude Include="cuda\device_buffer.h" />
-    <ClInclude Include="sdl\game_window.h" />
+    <ClInclude Include="cuda\cuda_simulation.hpp" />
+    <CudaCompile Include="cuda\device_buffer.cuh" />
+    <CudaCompile Include="cuda\simulation_buffers.cuh" />
+    <ClInclude Include="sdl\game_window.hpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="cuda\cuda_simulation.cu" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="CMakeLists.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,6 +1,7 @@
-#include "pch.h"
+#include <gtest/gtest.h>
+#include "cuda_simulation.hpp"
 
-TEST(TestCaseName, TestName) {
-  EXPECT_EQ(1, 1);
-  EXPECT_TRUE(true);
+TEST(Initialization, EmptyGrid) {
+	CUDASimulation::init(100, 100, false);
+
 }

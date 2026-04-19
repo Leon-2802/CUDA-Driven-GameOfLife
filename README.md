@@ -18,4 +18,4 @@ This project is a continuation of my [prior implementation](https://github.com/L
 - The simulation runs with CUDA via the use of CUDA kernels that run on the GPU using millions of threads
 - Only the relevant data of the current viewport is passed to the frontend for rendering
 ## Experience and learnings
-Here I list my experience and learnings as I work on this project. This will include both technical learnings about CUDA programming and general software development practices. A detailed step-by-step report of my development progress can be found in the [project report](./project_report.md).
+Here I list my experience and  learnings as I work on this project. This will include both technical learnings about CUDA programming and general software development practices. A detailed step-by-step report of my development progress can be found in the [project report](./project_report.md).
