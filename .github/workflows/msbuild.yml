@@ -13,7 +13,20 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: microsoft/setup-msbuild@v2
+    - name: Install vcpkg dependencies
+      run: |
+        vcpkg install sdl3:x64-windows
+        vcpkg integrate install
 
+    - name: Install CUDA Toolkit
+      uses: Jimver/cuda-toolkit@v0.2.19
+      with:
+        cuda: '13.2.0'
+        method: 'network'
+        sub-packages: '["nvcc", "visual_studio_integration"]'
+        
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+    
     - name: Build
       run: msbuild CUDA_GameOfLife.slnx /p:Configuration=Release /p:Platform=x64 /m
