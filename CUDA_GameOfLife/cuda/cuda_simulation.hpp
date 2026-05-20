@@ -5,8 +5,8 @@
 
 namespace CUDASimulation {
 	void init(const int gridWidth, const int gridHeight, bool randomCells);
-	//void setCellState(int x, int y);
 	void advance();
+	void queueFlip(const int x, const int y);
 
 	/*
 	* @brief Extract subgrid from the Game of Life grid and package it in vector of uint8_t values

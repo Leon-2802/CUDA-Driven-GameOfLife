@@ -43,18 +43,25 @@ int main() {
 
 		{
 			std::scoped_lock lock(viewportMutex);
+			viewport.processEvents();
+			if (viewport.getClickedCellCoords().has_value()) {
+				CUDASimulation::queueFlip(
+					viewport.getClickedCellCoords().value().first,
+					viewport.getClickedCellCoords().value().second);
+			}
 			auto viewportData = CUDASimulation::getViewportData(240, 1000, VIEWPORT_WIDTH / viewport.getCellSquareSize(), VIEWPORT_HEIGHT / viewport.getCellSquareSize());
 			if (viewportData.has_value()) {
 				viewport.update(viewportData.value());
 			} 
 		}
 	
-		running = viewport.userQuit();
+		running = viewport.windowRunning();
 
 		Uint32 frameTime = SDL_GetTicks() - frameStart;
 		if (frameTime < FRAME_DELAY) {
 			SDL_Delay(FRAME_DELAY - frameTime);
 		}
+
 	}
 
     return 0;

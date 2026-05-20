@@ -28,6 +28,10 @@ namespace CUDASimulation {
             std::swap(current_.ptr, next_.ptr);
         }
 
+        void flipCellStateInCurrentBuffer(int x, int y) {
+            current_.flipCellState(x, y);
+        }
+
         void clearCurrent() {
             current_.clearGrid();
         }

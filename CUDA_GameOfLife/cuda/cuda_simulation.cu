@@ -13,6 +13,8 @@
 #include <iostream>
 #include <memory>
 #include <chrono>
+#include <utility>
+#include <algorithm>
 
 
 
@@ -28,6 +30,9 @@ namespace CUDASimulation {
 
 	// Keep track of origin of current viewport on the GUI
 	static std::pair<int, int> currentViewportOrigin = { 0, 0 };
+
+	// Buffer for storing pending cell flip interactions from the UI with the buffer
+	static std::vector<std::pair<int, int>> pendingCellFlips;
 
 	// Helper macro for CUDA error checking
 #define RANSAC_CUDA_CHECK(ans)                      \
@@ -176,6 +181,12 @@ namespace CUDASimulation {
 	}
 
 	void advance() {
+		// apply any user edits to the current buffer first
+		for (auto& [x, y] : pendingCellFlips) {
+			simulationBuffers->flipCellStateInCurrentBuffer(x, y);
+		}
+		pendingCellFlips.clear();
+
 		// Create CUDA events for timing
 		cudaEvent_t start, stop;
 		cudaEventCreate(&start);
@@ -208,8 +219,26 @@ namespace CUDASimulation {
 		cudaEventDestroy(stop);
 	}
 
+	void queueFlip(const int x, const int y) {
+		const int xGridIndex = std::clamp(currentViewportOrigin.first + x, 0, simulationBuffers->width());
+		const int yGridIndex = std::clamp(currentViewportOrigin.second + y, 0, simulationBuffers->height());
+		pendingCellFlips.push_back({ xGridIndex, yGridIndex });
+	}
+
 	std::optional<std::vector<uint8_t>> getViewportData(const int startX, const int startY, const int viewportWidth, const int viewportHeight) {
 		currentViewportOrigin = { startX, startY };
-		return simulationBuffers->subgrid(startX, startY, viewportWidth, viewportHeight);
+		std::optional<std::vector<uint8_t>> viewportData = simulationBuffers->subgrid(startX, startY, viewportWidth, viewportHeight);
+
+		// apply pending flips, so they are pre-rendered before being processed in the advance() method
+		if (viewportData.has_value()) {
+			for (auto& [x, y] : pendingCellFlips) {
+				// x, y are grid coords, we offset them relative to viewport window
+				int localX = std::clamp(x - currentViewportOrigin.first, 0, viewportWidth);
+				int localY = std::clamp(y - currentViewportOrigin.second, 0, viewportHeight);
+				viewportData.value()[localY * viewportWidth + localX] ^= 1;
+			}
+		}
+
+		return viewportData;
 	}
 }

@@ -20,6 +20,9 @@
 - 40_000 x 40_000: Around 93/94ms, rare spikes slightly above 100ms -> **Current maximum problem size!**
 	- GPU usage: 91-92%
 	- 3.2 GB VRAM occupied (1.6GB for each simulation buffer)
+### Ideal CUDA block size
+16x16 block dimensions yields better results than bigger problem sizes
+-> 1.375x faster than block size 32x32
 
 ## Possible further optimization
 - Pinned memory (cudaMallocHost)?

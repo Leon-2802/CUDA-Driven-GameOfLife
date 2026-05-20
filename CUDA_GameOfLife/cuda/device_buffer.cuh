@@ -58,6 +58,21 @@ namespace CUDASimulation {
             return hostBuf;
         }
 
+        void flipCellState(int x, int y) const {
+            if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight) {
+                return; // out of bounds
+            }
+
+            uint8_t* targetCell = ptr + y * gridWidth + x;
+            
+            uint8_t hostVal;
+            cudaMemcpy(&hostVal, targetCell, sizeof(uint8_t), cudaMemcpyDeviceToHost);
+            hostVal ^= 1;
+            cudaMemcpy(targetCell, &hostVal, sizeof(uint8_t), cudaMemcpyHostToDevice);
+        }
+
+        //TODO add paint tool for drawing cells with host-side staging buffer and one cudaMemcpy at the end
+
         void clearGrid() const {
             cudaMemset(ptr, 0, size * sizeof(uint8_t));
         }

@@ -16,6 +16,8 @@ GameWindow::GameWindow(int width, int height, int cellSquareSize, bool fullscree
     SDL_SetRenderVSync(renderer_, 1); // enable vsync
     SDL_GetWindowSize(this->window_, &width_, &height_);
     this->cellSquareSize_ = cellSquareSize;
+    this->windowClosed_ = false;
+    this->clickedCellCoords_ = std::nullopt;
 }
 
 GameWindow::~GameWindow() {
@@ -33,21 +35,44 @@ void GameWindow::drawCell(int x, int y) {
 	// implement drawing a cell at (x, y) using SDL_Renderer
 }
 
-bool GameWindow::userQuit() {
+void GameWindow::processEvents() {
     while (SDL_PollEvent(&event_)) {
-        if (event_.type == SDL_EVENT_QUIT)
-            return false;
-        if (event_.type == SDL_EVENT_KEY_DOWN && event_.key.key == SDLK_ESCAPE)
-            return false;
+        switch (event_.type) {
+            case SDL_EVENT_QUIT:
+                windowClosed_ = true;
+                break;
+            case SDL_EVENT_KEY_DOWN:
+                if (event_.key.key == SDLK_ESCAPE)
+                    windowClosed_ = true;
+                break;
+            case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                handleMouseClick(event_);
+                break;
+        }
     }
-    return true;
+}
+
+void GameWindow::handleMouseClick(const SDL_Event& event) {
+    if (event.button.button == SDL_BUTTON_LEFT) {
+        int x = static_cast<int>(event.button.x / cellSquareSize_);
+        int y = static_cast<int>(event.button.y / cellSquareSize_);
+        clickedCellCoords_ = std::make_pair(x, y);
+    }
 }
 
 int GameWindow::getCellSquareSize() const {
     return this->cellSquareSize_;
 }
 
-void GameWindow::update(std::vector<uint8_t> viewportData) const {
+bool GameWindow::windowRunning() const {
+    return !windowClosed_;
+}
+
+std::optional<std::pair<int, int>> GameWindow::getClickedCellCoords() const {
+    return clickedCellCoords_;
+}
+
+void GameWindow::update(std::vector<uint8_t> viewportData) {
     SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255);
     SDL_RenderClear(renderer_);
 
@@ -63,6 +88,9 @@ void GameWindow::update(std::vector<uint8_t> viewportData) const {
             SDL_RenderFillRect(renderer_, &rect);
         }
     }
+
+    // Reset this value, as it should only contain an std::pair<int, int> if the user clicked a cell before update
+    this->clickedCellCoords_.reset();
 
     SDL_RenderPresent(renderer_);
 }
