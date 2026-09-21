@@ -60,9 +60,8 @@ namespace CUDASimulation {
 	}
 
 	/*
-	* @brief A noise-based RNG, reasonably well-known within game development circles.
+	* @brief A noise-based RNG
 	* Allows threads to compute their random value independently, based on their position on the grid.
-	* It is not as stable and tested as other more well-known RNG algorithms, but more than sufficient in this case.
 	*/
 	__device__ uint32_t squirrel3(uint32_t pos, uint32_t seed = 0) {
 		constexpr uint32_t BIT_NOISE1 = 0xB5297A4Du;

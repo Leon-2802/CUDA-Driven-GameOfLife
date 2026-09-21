@@ -12,13 +12,14 @@
 #define VIEWPORT_HEIGHT 800
 #define FRAME_DELAY 100
 #define CUDA_DELAY 100
+#define SIMULATION_GRID_DIMENSION 20000
 
 int main() {
 	GUI::GameWindow viewport(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, 5, false);
 	bool running = true;
 	std::mutex viewportMutex;
 
-	CUDASimulation::init(20000, 20000, true);
+	CUDASimulation::init(SIMULATION_GRID_DIMENSION, SIMULATION_GRID_DIMENSION, true);
 
 	// Launch CUDA simulation in a seperate thread and keep run with a tick of 100ms
 	// Prevents from blocking the main thread where to GUI runs
@@ -33,8 +34,9 @@ int main() {
 
 			auto elapsed = std::chrono::steady_clock::now() - tickStart;
 			auto remaining = std::chrono::milliseconds(CUDA_DELAY) - std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
-			if (remaining > std::chrono::milliseconds(0))
+			if (remaining > std::chrono::milliseconds(0)) {
 				std::this_thread::sleep_for(remaining);
+			}
 		}
 		});
 
@@ -49,10 +51,23 @@ int main() {
 					viewport.getClickedCellCoords().value().first,
 					viewport.getClickedCellCoords().value().second);
 			}
-			auto viewportData = CUDASimulation::getViewportData(240, 1000, VIEWPORT_WIDTH / viewport.getCellSquareSize(), VIEWPORT_HEIGHT / viewport.getCellSquareSize());
+
+			while (viewport.panningModeOn()) {
+				viewport.updateViewportOrigin({ SIMULATION_GRID_DIMENSION, SIMULATION_GRID_DIMENSION});
+				viewport.processEvents();
+				std::cout << "X: " << viewport.getViewportOriginCoords().first << " Y: " << viewport.getViewportOriginCoords().second << std::endl;
+				auto viewportData = CUDASimulation::getViewportData(viewport.getViewportOriginCoords().first, viewport.getViewportOriginCoords().second, 
+					VIEWPORT_WIDTH / viewport.getCellSquareSize(), VIEWPORT_HEIGHT / viewport.getCellSquareSize());
+				if (viewportData.has_value()) {
+					viewport.update(viewportData.value());
+				} 
+			}
+
+			auto viewportData = CUDASimulation::getViewportData(viewport.getViewportOriginCoords().first, viewport.getViewportOriginCoords().second,
+				VIEWPORT_WIDTH / viewport.getCellSquareSize(), VIEWPORT_HEIGHT / viewport.getCellSquareSize());
 			if (viewportData.has_value()) {
 				viewport.update(viewportData.value());
-			} 
+			}
 		}
 	
 		running = viewport.windowRunning();
