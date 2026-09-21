@@ -2,30 +2,56 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include "common_functions.h"
+#include <math_functions.h>
 #include "driver_types.h"
 
-// System includes
+// Local includes
+#include "simulation_buffers.cuh"
+#include "cuda_simulation.hpp"
+
+// standard library includes
 #include <iostream>
 #include <memory>
 #include <chrono>
-
-// Local includes
-#include "device_buffer.h"
-#include "cuda_simulation.h"
-
+#include <utility>
+#include <algorithm>
 
 
 
 namespace CUDASimulation {
 
-#define NUM_THREADS_PER_BLOCK 1024
+#define BLOCK_SIZE_X 16
+#define BLOCK_SIZE_Y 16
 
 	// Grid of Game of Life, to be allocated on the device (GPU)
 	// Two are required to save redundant copying of data
 	// Static to keep it local to this file
-	static std::shared_ptr<SimulationBuffers> simumationBuffers = nullptr;
+	static std::shared_ptr<SimulationBuffers> simulationBuffers = nullptr;
 
-	/**
+	// Keep track of origin of current viewport on the GUI
+	static std::pair<int, int> currentViewportOrigin = { 0, 0 };
+
+	// Buffer for storing pending cell flip interactions from the UI with the buffer
+	static std::vector<std::pair<int, int>> pendingCellFlips;
+
+	// Helper macro for CUDA error checking
+#define RANSAC_CUDA_CHECK(ans)                      \
+    {                                               \
+        ransacGpuAssert((ans), __FILE__, __LINE__); \
+    }
+	inline void ransacGpuAssert(cudaError_t code, const char* file, int line,
+		bool abort = true)
+	{
+		if (code != cudaSuccess)
+		{
+			fprintf(stderr, "RANSAC_GPU_Assert: %s %s %d\n", cudaGetErrorString(code), file,
+				line);
+			if (abort)
+				exit(code);
+		}
+	}
+
+	/*
 	* @brief Provides easier row and column based index for a 2D matrix that is layed out in 1D row-major order
 	*/
 	__device__ __forceinline__ int calcIdx(int row, int numCols, int col)
@@ -34,9 +60,8 @@ namespace CUDASimulation {
 	}
 
 	/*
-	* @brief A noise-based RNG, reasonably well-known within game development circles.
+	* @brief A noise-based RNG
 	* Allows threads to compute their random value independently, based on their position on the grid.
-	* It is not as stable and tested as other more well-known RNG algorithms, but more than sufficient in this case.
 	*/
 	__device__ uint32_t squirrel3(uint32_t pos, uint32_t seed = 0) {
 		constexpr uint32_t BIT_NOISE1 = 0xB5297A4Du;
@@ -57,62 +82,109 @@ namespace CUDASimulation {
 	/**
 	* @brief This CUDA kernel intializes the grid with random values for the cell states
 	*/
-	__global__ void initializeGridRandom(uint8_t* dGrid, const int totalCells, uint32_t seed) {
-		int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	__global__ void initializeGridRandom(uint8_t* dGrid, const int width, const int height, const uint32_t seed) {
+		const int paddedWidth = width + 2;
 
-		// guard against out-of-bounds access (necessary as last thread block may be partial)
-		if (idx >= totalCells) return;  
+		// Padded coords
+		const int px = blockIdx.x * blockDim.x + threadIdx.x + 1;
+		const int py = blockIdx.y * blockDim.y + threadIdx.y + 1;
+		// Guard against out of bounds access
+		if ((px - 1) >= width || (py - 1) >= height) return;
 
-		// Aquire random value based on current position
-		dGrid[idx] = squirrel3(idx, seed) >> 31; // 0 or 1
+		int idx = calcIdx(py, paddedWidth, px);
+		dGrid[idx] = (squirrel3(idx, seed) >> 31) & (squirrel3(idx, seed + 1) >> 31); // 25% chance of value 1
 	}
 
 	/**
 	* @brief Calculates the state of each cell on a seperate thread by reading neighbour cell states from global memory
 	*/
-	__global__ void calculateNextGeneration(uint8_t* dGrid, const int width, const int height) {
+	__global__ void calculateNextGeneration(uint8_t* dGridCurrent, uint8_t* dGridNext, const int width, const int height) {
 		// REFACTOR: Add shared memory later to lower slow global memory traffic
+		const int paddedWidth = width + 2;
+
+		// Padded coords
+		const int px = blockIdx.x * blockDim.x + threadIdx.x + 1; 
+		const int py = blockIdx.y * blockDim.y + threadIdx.y + 1;
+		// Guard against out of bounds access
+		if ((px-1) >= width || (py-1) >= height) return;
+
+		// Neighbor indices
+		int left = px - 1;
+		int right = px + 1;
+		int up = py - 1;
+		int down = py + 1;
+
+		// Retrieve values of the 8 neighbors and increase sum by 1 if alive
+		uint8_t aliveNeighbors =
+			(dGridCurrent[calcIdx(up, paddedWidth, left)] != 0) +
+			(dGridCurrent[calcIdx(up, paddedWidth, px)] != 0) +
+			(dGridCurrent[calcIdx(up, paddedWidth, right)] != 0) +
+			(dGridCurrent[calcIdx(py, paddedWidth, left)] != 0) +
+			(dGridCurrent[calcIdx(py, paddedWidth, right)] != 0) +
+			(dGridCurrent[calcIdx(down, paddedWidth, left)] != 0) +
+			(dGridCurrent[calcIdx(down, paddedWidth, px)] != 0) +
+			(dGridCurrent[calcIdx(down, paddedWidth, right)] != 0);
+
+		uint8_t alive = dGridCurrent[calcIdx(py, paddedWidth, px)] != 0;
+		
+		// GoL rules:
+		// - Live cell survives with 2 or 3 neighbors
+		// - Dead cell born with exactly 3 neighbors
+		// Use bitwise operators instead of logical operators to prevent warp divergence
+		uint8_t survives = alive & ((aliveNeighbors == 2) | (aliveNeighbors == 3)); 
+		uint8_t born = (1 - alive) & (aliveNeighbors == 3);
+
+		dGridNext[calcIdx(py, paddedWidth, px)] = survives | born;
 	}
 
-	void init(int gridWidth, int gridHeight) {
-		const int totalCells = gridWidth * gridHeight;
-		simumationBuffers = std::make_shared<SimulationBuffers>(gridWidth, gridHeight);
+
+	void init(const int gridWidth, const int gridHeight, bool randomCells) {
+		// Allocate with zero-padded border
+		const int paddedWidth = gridWidth + 2;
+		const int paddedHeight = gridHeight + 2;
+		simulationBuffers = std::make_shared<SimulationBuffers>(paddedWidth, paddedHeight);
 		// Check for errors after allocating:
-		cudaError_t err = cudaGetLastError();
-		if (err != cudaSuccess) std::cerr << cudaGetErrorString(err) << std::endl;
+		RANSAC_CUDA_CHECK(cudaGetLastError());
 
-		// Create CUDA events for timing
-		cudaEvent_t start, stop;
-		cudaEventCreate(&start);
-		cudaEventCreate(&stop);
-		// Record the start event
-		cudaEventRecord(start);
+		if (randomCells) {
+			// Create CUDA events for timing
+			cudaEvent_t start, stop;
+			cudaEventCreate(&start);
+			cudaEventCreate(&stop);
+			// Record the start event
+			cudaEventRecord(start);
 
-		// Each thread covers one cell; ceiling division ensures every cell gets covered
-		const int numBlocks = (totalCells + NUM_THREADS_PER_BLOCK - 1) / NUM_THREADS_PER_BLOCK;
-		// Aquire the seed based on current time in nanoseconds
-		const uint32_t seed = static_cast<uint32_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
-		// Run the kernel
-		initializeGridRandom << <numBlocks, NUM_THREADS_PER_BLOCK >> > (simumationBuffers->currentPtr(), totalCells, seed);
+			dim3 blockSize(BLOCK_SIZE_X, BLOCK_SIZE_Y);
+			dim3 gridSize(
+				(gridWidth + blockSize.x - 1) / blockSize.x, // ceiling division ensures every cell gets covered
+				(gridHeight + blockSize.y - 1) / blockSize.y
+			);
+			// Aquire the seed based on current time in nanoseconds
+			const uint32_t seed = static_cast<uint32_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+			// Run the kernel
+			initializeGridRandom << <gridSize, blockSize >> > (simulationBuffers->currentPtr(), gridWidth, gridHeight, seed);
+			RANSAC_CUDA_CHECK(cudaGetLastError());
 
-		err = cudaGetLastError();
-		if (err != cudaSuccess) std::cerr << cudaGetErrorString(err) << std::endl;
-
-		// Record the stop event
-		cudaEventRecord(stop);
-		// Wait for the stop event to complete
-		cudaEventSynchronize(stop);
-		// Calculate the elapsed time
-		float milliseconds = 0;
-		cudaEventElapsedTime(&milliseconds, start, stop);
-		std::cout << "Runtime for initialization with grid dimension " << gridWidth << " x " << gridHeight << " in milliseconds: " << milliseconds << std::endl;
-		// Cleanup events
-		cudaEventDestroy(start);
-		cudaEventDestroy(stop);
+			// Record the stop event
+			cudaEventRecord(stop);
+			// Wait for the stop event to complete
+			cudaEventSynchronize(stop);
+			// Calculate the elapsed time
+			float milliseconds = 0;
+			cudaEventElapsedTime(&milliseconds, start, stop);
+			std::cout << "Runtime for initialization with grid dimension " << gridWidth << " x " << gridHeight << " in milliseconds: " << milliseconds << std::endl;
+			// Cleanup events
+			cudaEventDestroy(start);
+			cudaEventDestroy(stop);
+		}
 	}
 
 	void advance() {
-		const int totalCells = simumationBuffers->width() * simumationBuffers->height();
+		// apply any user edits to the current buffer first
+		for (auto& [x, y] : pendingCellFlips) {
+			simulationBuffers->flipCellStateInCurrentBuffer(x, y);
+		}
+		pendingCellFlips.clear();
 
 		// Create CUDA events for timing
 		cudaEvent_t start, stop;
@@ -121,11 +193,17 @@ namespace CUDASimulation {
 		// Record the start event
 		cudaEventRecord(start);
 
-		// Each thread covers one cell; ceiling division ensures every cell gets covered
-		const int numBlocks = (totalCells + NUM_THREADS_PER_BLOCK - 1) / NUM_THREADS_PER_BLOCK;
+		dim3 blockSize(BLOCK_SIZE_X, BLOCK_SIZE_Y);
+		dim3 gridSize(
+			(simulationBuffers->paddedWidth() + blockSize.x - 1) / blockSize.x, // ceiling division ensures every cell gets covered
+			(simulationBuffers->paddedHeight() + blockSize.y - 1) / blockSize.y
+		);
+		calculateNextGeneration << <gridSize, blockSize >> >
+			(simulationBuffers->currentPtr(), simulationBuffers->nextPtr(), simulationBuffers->width(), simulationBuffers->height());
+		RANSAC_CUDA_CHECK(cudaGetLastError());
 
-		cudaError_t err = cudaGetLastError();
-		if (err != cudaSuccess) std::cerr << cudaGetErrorString(err) << std::endl;
+		// Swap after computation -> the next generation becomes the current generation of the next step
+		simulationBuffers->swap();
 
 		// Record the stop event
 		cudaEventRecord(stop);
@@ -134,17 +212,32 @@ namespace CUDASimulation {
 		// Calculate the elapsed time
 		float milliseconds = 0;
 		cudaEventElapsedTime(&milliseconds, start, stop);
-		std::cout << "Runtime for advance step with grid dimension " << simumationBuffers->width() << " x " << simumationBuffers->height() << " in milliseconds: " << milliseconds << std::endl;
+		std::cout << "Runtime for advance step with grid dimension " << simulationBuffers->width() << " x " << simulationBuffers->height() << " in milliseconds: " << milliseconds << std::endl;
 		// Cleanup events
 		cudaEventDestroy(start);
 		cudaEventDestroy(stop);
 	}
 
-	std::vector<bool> getViewportData(int startX, int startY, int viewportWidth, int viewportHeight) {
-		std::vector<bool> subgrid;
-		// Reserve the necessary space of the subgrid (note that the origin of the grid is at the top left corner of the screen)
-		subgrid.reserve((viewportWidth - startX) * (viewportHeight - startY));
-		//TODO memcpy from simumationBuffers->currentPtr to subgrid
-		return subgrid;
+	void queueFlip(const int x, const int y) {
+		const int xGridIndex = std::clamp(currentViewportOrigin.first + x, 0, simulationBuffers->width());
+		const int yGridIndex = std::clamp(currentViewportOrigin.second + y, 0, simulationBuffers->height());
+		pendingCellFlips.push_back({ xGridIndex, yGridIndex });
+	}
+
+	std::optional<std::vector<uint8_t>> getViewportData(const int startX, const int startY, const int viewportWidth, const int viewportHeight) {
+		currentViewportOrigin = { startX, startY };
+		std::optional<std::vector<uint8_t>> viewportData = simulationBuffers->subgrid(startX, startY, viewportWidth, viewportHeight);
+
+		// apply pending flips, so they are pre-rendered before being processed in the advance() method
+		if (viewportData.has_value()) {
+			for (auto& [x, y] : pendingCellFlips) {
+				// x, y are grid coords, we offset them relative to viewport window
+				int localX = std::clamp(x - currentViewportOrigin.first, 0, viewportWidth);
+				int localY = std::clamp(y - currentViewportOrigin.second, 0, viewportHeight);
+				viewportData.value()[localY * viewportWidth + localX] ^= 1;
+			}
+		}
+
+		return viewportData;
 	}
 }
